@@ -1,0 +1,48 @@
+name: Fetch game assets for analysis
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout working branch
+        uses: actions/checkout@v4
+        with:
+          ref: arena/3382a2c5-just-sm
+          fetch-depth: 1
+
+      - name: Checkout main with game files (pointers only)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: game
+          lfs: false
+          fetch-depth: 1
+
+      - name: Download only the managed game assemblies via LFS
+        working-directory: game
+        run: |
+          git lfs install --local
+          git config lfs.fetchinclude 'Magic Studies_Data/Managed/Assembly-CSharp*.dll'
+          git lfs fetch origin main
+          git lfs checkout
+
+      - name: Copy assemblies into the analysis folder
+        run: |
+          mkdir -p analysis
+          cp 'game/Magic Studies_Data/Managed/Assembly-CSharp.dll' analysis/
+          cp 'game/Magic Studies_Data/Managed/Assembly-CSharp-firstpass.dll' analysis/
+          ls -lh analysis/
+
+      - name: Commit assemblies to this branch
+        run: |
+          git config user.name 'Arena Agent'
+          git config user.email 'agent@arena.ai'
+          git add analysis
+          git commit -m 'chore: fetch managed assemblies for analysis' || echo 'nothing to commit'
+          git push origin HEAD:arena/3382a2c5-just-sm
